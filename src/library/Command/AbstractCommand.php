@@ -20,6 +20,7 @@ use M4bTool\Executables\Mp4chaps;
 use M4bTool\Executables\Mp4info;
 use M4bTool\Executables\Mp4tags;
 use M4bTool\Executables\Mp4v2Wrapper;
+use M4bTool\Executables\Tone;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 use Psr\Log\LogLevel;
@@ -31,6 +32,10 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Twig\Environment as Twig_Environment;
+use Twig\Error\LoaderError;
+use Twig\Error\SyntaxError;
+use Twig\Loader\ArrayLoader as Twig_Loader_Array;
 
 class AbstractCommand extends Command implements LoggerInterface
 {
@@ -69,6 +74,7 @@ class AbstractCommand extends Command implements LoggerInterface
     const OPTION_DEBUG = "debug";
     const OPTION_LOG_FILE = "logfile";
     const OPTION_FORCE = "force";
+    const OPTION_FILENAME_TEMPLATE = "filename-template";
     const OPTION_TMP_DIR = "tmp-dir";
     const OPTION_NO_CLEANUP = "no-cleanup";
     const OPTION_NO_CACHE = "no-cache";
@@ -87,6 +93,8 @@ class AbstractCommand extends Command implements LoggerInterface
     const OPTION_OUTPUT_FILE_SHORTCUT = "o";
 
     const ENV_TMP_DIR = "M4BTOOL_TMP_DIR";
+
+    const DEFAULT_SPLIT_FILENAME_TEMPLATE = "{{\"%03d\"|format(track)}}-{{title|raw}}";
 
     const LOG_LEVEL_TO_VERBOSITY = [
         LogLevel::DEBUG => OutputInterface::VERBOSITY_DEBUG,
@@ -137,6 +145,9 @@ class AbstractCommand extends Command implements LoggerInterface
      */
     protected $optDebug = false;
 
+    /** @var string */
+    protected $optFilenameTemplate;
+
     /**
      * @var SplFileInfo
      */
@@ -150,6 +161,9 @@ class AbstractCommand extends Command implements LoggerInterface
     protected $ffmpeg;
     /** @var Mp4v2Wrapper */
     protected $mp4v2;
+    /** @var Tone */
+    protected $tone;
+
     /** @var ChapterMarker */
     protected $chapterMarker;
     /** @var ChapterHandler */
@@ -178,7 +192,13 @@ class AbstractCommand extends Command implements LoggerInterface
 
         $fdkaac = new Fdkaac();
         $fdkaac->setLogger($this);
-        $this->metaHandler = new BinaryWrapper($this->ffmpeg, $this->mp4v2, $fdkaac);
+
+        $this->tone = new Tone();
+        $this->tone->setLogger($this);
+
+        $this->metaHandler = new BinaryWrapper($this->ffmpeg, $this->mp4v2, $fdkaac, $this->tone);
+
+
 
         // todo: merge these two classes?
         $this->chapterHandler = new ChapterHandler($this->metaHandler);
@@ -292,7 +312,7 @@ class AbstractCommand extends Command implements LoggerInterface
         $this->addOption(static::OPTION_SILENCE_MIN_LENGTH, "a", InputOption::VALUE_OPTIONAL, "silence minimum length in milliseconds", static::SILENCE_DEFAULT_LENGTH);
         $this->addOption(static::OPTION_SILENCE_MAX_LENGTH, "b", InputOption::VALUE_OPTIONAL, "silence maximum length in milliseconds", 0);
         $this->addOption(static::OPTION_MAX_CHAPTER_LENGTH, null, InputOption::VALUE_OPTIONAL, "maximum chapter length in seconds - its also possible to provide a desired chapter length in form of 300,900 where 300 is desired and 900 is max - if the max chapter length is exceeded, the chapter is placed on the first silence between desired and max chapter length", "0");
-
+        $this->addOption(static::OPTION_FILENAME_TEMPLATE, "p", InputOption::VALUE_OPTIONAL, "filename twig-template for output file naming");
     }
 
     function dasherize($string)
@@ -355,6 +375,7 @@ class AbstractCommand extends Command implements LoggerInterface
         $this->optForce = $this->input->getOption(static::OPTION_FORCE);
         $this->optNoCache = $this->input->getOption(static::OPTION_NO_CACHE);
         $this->optTmpDir = $this->input->getOption(static::OPTION_TMP_DIR) ?? $this->getEnvironmentVariable(static::ENV_TMP_DIR);
+        $this->optFilenameTemplate = $this->input->getOption(static::OPTION_FILENAME_TEMPLATE);
     }
 
     protected function getEnvironmentVariable($name)
@@ -453,5 +474,41 @@ class AbstractCommand extends Command implements LoggerInterface
         }
 
         return $output;
+    }
+
+
+    /**
+     * @param string $template
+     * @param string $extension
+     * @param array $templateParameters
+     * @return string
+     * @throws LoaderError
+     * @throws SyntaxError
+     */
+    protected function buildFileName(string $template, string $extension, array $templateParameters=[])
+    {
+        $env = new Twig_Environment(new Twig_Loader_Array([]));
+        $template = $env->createTemplate($template);
+        $fileNameTemplate = $template->render($templateParameters);
+        $replacedFileName = preg_replace("/[\r\n]/", "", $fileNameTemplate);
+        $replacedFileName = preg_replace('/[<>:\"|?*]/', "", $replacedFileName);
+        $replacedFileName = preg_replace('/[\x00-\x1F\x7F]/u', '', $replacedFileName);
+        return $replacedFileName . "." . $extension;
+    }
+
+    /**
+     * @param $directory
+     * @param $suffix
+     * @return string
+     */
+    protected static function normalizeDirectory($directory, $suffix = "/")
+    {
+        $normalized = rtrim(strtr($directory, [
+            "\\" => "/",
+        ]), "/");
+        if ($normalized !== "") {
+            $normalized .= $suffix;
+        }
+        return $normalized;
     }
 }

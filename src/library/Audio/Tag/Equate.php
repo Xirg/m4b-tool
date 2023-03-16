@@ -61,13 +61,13 @@ class Equate extends AbstractTagImprover
                 continue;
             }
 
-            if (!is_scalar($tag->$sourceProperty)) {
-                $this->warning(sprintf("source property %s is not a scalar value and cannot be equateed", $sourceProperty));
+            if ($tag->$sourceProperty == null || !is_scalar($tag->$sourceProperty)) {
+                $this->warning(sprintf("source property %s is not a scalar value or null and cannot be equated", $sourceProperty));
                 continue;
             }
 
-            if (!is_scalar($tag->$destinationProperty)) {
-                $this->warning(sprintf("destination property %s is not a scalar value and cannot be equateed", $sourceProperty));
+            if ($tag->$destinationProperty != null && !is_scalar($tag->$destinationProperty)) {
+                $this->warning(sprintf("destination property %s is not a scalar value and cannot be equated", $sourceProperty));
                 continue;
             }
             $improvedProperties[$destinationProperty] = [

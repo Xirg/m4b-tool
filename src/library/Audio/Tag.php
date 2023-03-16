@@ -83,49 +83,85 @@ class Tag implements ArrayAccess, JsonSerializable
         "seriesPart"
     ];
 
-    public $encoder;
-    public $title;
-    public $sortTitle; // -sortname on mp4tags (means sort chapter title in itunes)
-    public $artist;
-    public $sortArtist; // -sortartist on mp4tags (means sort author in itunes)
-    public $genre;
-    public $writer;
-    public $sortWriter;
     public $album;
-    public $sortAlbum; // -sortalbum on mp4tags (means sort title in itunes)
-    public $disk;
-    public $disks;
-    public $grouping;
-    /** @var PurchaseDateTime */
-    public $purchaseDate;
     public $albumArtist;
-    public $sortAlbumArtist;
-    public $year;
-    public $track;
-    public $tracks;
-    public $cover;
-    public $description;
-    public $longDescription;
+    public $artist;
     public $comment;
     public $copyright;
+    public $cover;
+    public $description;
+    public $disk;
+    public $disks;
     public $encodedBy;
+    public $encoder;
+    public $genre;
+    public $grouping;
+    public $longDescription;
+
+    /** @var PurchaseDateTime */
+    public $purchaseDate;
+    public $series;
+    public $seriesPart;
+    public $sortAlbum; // -sortalbum on mp4tags (means sort title in itunes)
+    public $sortAlbumArtist;
+    public $sortArtist; // -sortartist on mp4tags (means sort author in itunes)
+    public $sortTitle; // -sortname on mp4tags (means sort chapter title in itunes)
+    public $sortWriter;
+    public $title;
+    public $track;
+    public $tracks;
     public $type = self::MEDIA_TYPE_AUDIO_BOOK;
+    public $writer;
+    public $year;
+    public $publisher; // TPUB
 
     // MP3 Specific
     public $performer; // TPE3
     public $language; // TLAN
-    public $publisher; // TPUB
     public $lyrics; // TSLT
 
     /** @var Chapter[] */
     public $chapters = [];
 
-    // pseudo tags that are used to auto generate sort properties, if not present
-    public $series;
-    public $seriesPart;
-
     public $extraProperties = [];
     public $removeProperties = [];
+
+
+    const PROPERTY_ALBUM = "album";
+    const PROPERTY_ALBUM_ARTIST = "albumArtist";
+    const PROPERTY_ARTIST = "artist";
+    const PROPERTY_COMMENT = "comment";
+    const PROPERTY_COPYRIGHT = "copyright";
+    const PROPERTY_COVER = "cover";
+    const PROPERTY_DESCRIPTION = "description";
+    const PROPERTY_DISK = "disk";
+    const PROPERTY_DISKS = "disks";
+    const PROPERTY_ENCODED_BY = "encodedBy";
+    const PROPERTY_ENCODER = "encoder";
+    const PROPERTY_GENRE = "genre";
+    const PROPERTY_GROUPING = "grouping";
+    const PROPERTY_LONG_DESCRIPTION = "longDescription";
+    const PROPERTY_PURCHASE_DATE = "purchaseDate";
+    const PROPERTY_SERIES = "series";
+    const PROPERTY_SERIES_PART = "seriesPart";
+    const PROPERTY_SORT_ALBUM = "sortAlbum";
+    const PROPERTY_SORT_ALBUM_ARTIST = "sortAlbumArtist";
+    const PROPERTY_SORT_ARTIST = "sortArtist";
+    const PROPERTY_SORT_TITLE = "sortTitle";
+    const PROPERTY_SORT_WRITER = "sortWriter";
+
+    const PROPERTY_TITLE = "title";
+    const PROPERTY_TRACK = "track";
+    const PROPERTY_TRACKS = "tracks";
+    const PROPERTY_TYPE = "type";
+
+    const PROPERTY_WRITER = "writer";
+    const PROPERTY_YEAR = "year";
+    const PROPERTY_PUBLISHER = "publisher";
+    const PROPERTY_PERFORMER = "performer";
+    const PROPERTY_LANGUAGE = "language";
+    const PROPERTY_LYRICS = "lyrics";
+
 
 
     public function mergeMissing(Tag $tag)

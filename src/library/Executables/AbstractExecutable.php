@@ -4,6 +4,7 @@
 namespace M4bTool\Executables;
 
 
+use Exception;
 use M4bTool\Audio\Traits\LogTrait;
 use SplFileInfo;
 use Symfony\Component\Console\Helper\DebugFormatterHelper;
@@ -17,6 +18,13 @@ abstract class AbstractExecutable
 {
     use LogTrait;
     const PIPE = "|";
+
+    // kept for backwards compatibility, when chapters.txt format was unspecified this was a custom m4b-tool extension
+    const COMMENT_TAG_TOTAL_LENGTH = "total-length";
+
+    // real comment tags, like specified in https://github.com/enzo1982/mp4v2/issues/3
+    const COMMENT_TAG_TOTAL_DURATION = "total-duration:";
+    public static ?float $globalTimeout;
 
     /** @var string */
     protected $pathToBinary;
@@ -70,7 +78,16 @@ abstract class AbstractExecutable
     {
         array_unshift($arguments, $this->pathToBinary);
         $this->debugCommand($arguments);
-        return new Process($arguments, null, null, null, $timeout);
+        if(static::$globalTimeout !== null) {
+            $timeout = static::$globalTimeout;
+           $this->debug(sprintf("global timeout override: %s", $timeout));
+
+        }
+        $process = new Process($arguments, null, null, null, $timeout);
+        if($timeout !== null) {
+            $process->setIdleTimeout($timeout);
+        }
+        return $process;
     }
 
     /**
@@ -132,10 +149,21 @@ abstract class AbstractExecutable
         return '"' . str_replace(['"', '^', '%', '!', "\n"], ['""', '"^^"', '"^%"', '"^!"', '!LF!'], $argument) . '"';
     }
 
-    protected function debugCommand($command)
+    /**
+     * @param array $command
+     * @return string
+     */
+    protected function buildDebugCommand(array $command)
     {
-        $escapedArguments = array_map([$this, "escapeNonePipeArgument"], $command);
-        $this->debug(implode(" ", $escapedArguments));
+        $escapedArguments = array_map(function ($parameter) {
+            return $this->escapeNonePipeArgument($parameter);
+        }, $command);
+        return implode(" ", $escapedArguments);
+    }
+
+    protected function debugCommand(array $command)
+    {
+        $this->debug($this->buildDebugCommand($command));
     }
 
     protected static function normalizeDirectorySeparator($outputFile)
@@ -144,6 +172,41 @@ abstract class AbstractExecutable
             return $outputFile;
         }
         return new SplFileInfo((string)str_replace("/", DIRECTORY_SEPARATOR, $outputFile));
+    }
+
+    public function buildChaptersTxt(array $chapters)
+    {
+        return static::toChaptersTxt($chapters);
+    }
+
+
+    public static function toChaptersTxt(array $chapters) {
+        $chaptersAsLines = [];
+        $chapter = null;
+        foreach ($chapters as $chapter) {
+            $chaptersAsLines[] = $chapter->getStart()->format() . " " . $chapter->getName();
+        }
+
+        if ($chapter !== null && $chapter->getLength()->milliseconds() > 0) {
+            array_unshift($chaptersAsLines, sprintf("## %s: %s", static::COMMENT_TAG_TOTAL_DURATION, $chapter->getEnd()->format()));
+        }
+
+        return implode(PHP_EOL, $chaptersAsLines);
+    }
+
+    /**
+     * @throws Exception
+     */
+    protected function handleExitCode(SymfonyProcess $process, array $command, SplFileInfo $file, $exceptionDetails = [])
+    {
+        // protected $exceptionDetails = [];
+
+        if ($process->getExitCode() !== 0) {
+            $exceptionDetails[] = "command: " . $this->buildDebugCommand($command);
+            $exceptionDetails[] = "output:";
+            $exceptionDetails[] = $process->getOutput() . $process->getErrorOutput();
+            throw new Exception(sprintf("Could not tag file:\nfile: %s\nexit-code:%d\n%s", $file, $process->getExitCode(), implode(PHP_EOL, $exceptionDetails)));
+        }
     }
 
 }
